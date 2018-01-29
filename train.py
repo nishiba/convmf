@@ -46,9 +46,9 @@ def make_item_descriptions():
 
 
 def train_model():
-    batch_size = 1
-    n_epoch = 10
-    gpu = -1
+    batch_size = 50
+    n_epoch = 50
+    gpu = 0
 
     ratings = make_rating_data()
     filter_windows = [3, 4, 5]

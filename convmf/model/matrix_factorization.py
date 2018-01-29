@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 import chainer
-
+import cupy as cp
 
 class RatingData(NamedTuple):
     user: int
@@ -17,6 +17,14 @@ class RatingData(NamedTuple):
 class IndexRatingSet(NamedTuple):
     indices: List[int]
     ratings: List[float]
+
+    @staticmethod
+    def to_gpu(x):
+        return IndexRatingSet(indices=chainer.cuda.to_gpu(x.indices), ratings=chainer.cuda.to_gpu(x.ratings))
+
+    @staticmethod
+    def to_cpu(x):
+        return IndexRatingSet(indices=chainer.cuda.to_cpu(x.indices), ratings=chainer.cuda.to_cpu(x.ratings))
 
 
 class MatrixFactorization(object):
@@ -45,7 +53,7 @@ class MatrixFactorization(object):
             ratings = self.user_item_list[u].ratings
             v = self.item_factors[:, indices]
             a = self.xp.dot(v, v.T)
-            a[self.xp.diag_indices_from(a)] += self.user_lambda
+            a[np.diag_indices_from(a)] += self.user_lambda
             b = self.xp.dot(v, ratings)
             self.user_factors[:, u] = self.xp.linalg.solve(a, b)
 
@@ -55,7 +63,7 @@ class MatrixFactorization(object):
             ratings = self.item_user_list[v].ratings
             u = self.user_factors[:, indices]
             a = self.xp.dot(u, u.T)
-            a[self.xp.diag_indices_from(a)] += self.item_lambda
+            a[np.diag_indices_from(a)] += self.item_lambda
             b = self.xp.dot(u, ratings)
             if additional is not None:
                 b += self.item_lambda * additional[v]
@@ -64,7 +72,13 @@ class MatrixFactorization(object):
     def to_gpu(self):
         self.user_factors = chainer.cuda.to_gpu(self.user_factors)
         self.item_factors = chainer.cuda.to_gpu(self.item_factors)
+        self.user_item_list = {k: IndexRatingSet.to_gpu(v) for k, v in self.user_item_list.items()}
+        self.item_user_list = {k: IndexRatingSet.to_gpu(v) for k, v in self.item_user_list.items()}
+        self.xp = cp
 
     def to_cpu(self):
         self.user_factors = chainer.cuda.to_cpu(self.user_factors)
         self.item_factors = chainer.cuda.to_cpu(self.item_factors)
+        self.user_item_list = {k: IndexRatingSet.to_cpu(v) for k, v in self.user_item_list.items()}
+        self.item_user_list = {k: IndexRatingSet.to_cpu(v) for k, v in self.item_user_list.items()}
+        self.xp = np

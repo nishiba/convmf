@@ -23,3 +23,11 @@ pip install -r requirements.txt
       - tmdb-5000-movie-dataset/
   ```
   
+# Run
+```bash
+python preprocessing.py
+```
+
+```bash
+python train.py
+```
