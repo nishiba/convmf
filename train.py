@@ -65,7 +65,7 @@ def train_convmf():
     user_lambda = 10
     item_lambda = 100
 
-    with open('./result/mf.pkl ', 'rb') as f:
+    with open('./result/mf.pkl', 'rb') as f:
         mf = pickle.load(f)
 
     model = ConvMF(ratings=ratings,
@@ -143,7 +143,7 @@ def train_mf():
         rmse = np.sqrt(np.mean(np.square(predict - np.array([r.rating for r in test]))))
         print('rmse: %.4f' % rmse)
 
-    with open('./result/mf.pkl ', 'wb') as f:
+    with open('./result/mf.pkl', 'wb') as f:
         pickle.dump(model, f)
 
 
