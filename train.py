@@ -53,7 +53,7 @@ def train_convmf():
     batch_size = 50
     n_epoch = 50
     n_sub_epoch = 10
-    gpu = -1
+    gpu = 0
 
     ratings = make_rating_data()
     filter_windows = [3, 4, 5]
@@ -102,7 +102,7 @@ def train_convmf():
     trainer.extend(extensions.ProgressBar())
     trainer.extend(ConvMFUpdater(model))
 
-    for n in range(n_epoch, step=n_sub_epoch):
+    for n in range(0, n_epoch, n_sub_epoch):
         trainer.run()
         with chainer.using_config('train', False):
             model.to_cpu()
