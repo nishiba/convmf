@@ -101,7 +101,7 @@ def train_convmf():
             'test/main/loss',
             'elapsed_time']))
     trainer.extend(extensions.ProgressBar())
-    trainer.extend(ConvMFUpdater(model))
+    # trainer.extend(ConvMFUpdater(model))
 
     for n in range(0, n_epoch, n_sub_epoch):
         trainer.run()
