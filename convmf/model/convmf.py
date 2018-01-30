@@ -57,7 +57,7 @@ class ConvMF(chainer.Chain):
         return self.convolution(x=x, train=False)
 
     def predict(self, users: List[int], items: List[int]) -> List[float]:
-        item_factors = [self.convolution(x=self.item_descriptions[i], train=False).data for i in items]
+        item_factors = [self.convolution(x=np.array([self.item_descriptions[i]]), train=False).data for i in items]
         user_factors = [self.mf.user_factors[u] for u in users]
         predictions = [np.inner(u, i) for u, i in zip(user_factors, item_factors)]
         return predictions
