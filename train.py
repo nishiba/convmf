@@ -86,7 +86,8 @@ def train_convmf():
 
     train_ratings, test_ratings = train_test_split(ratings, test_size=0.1, random_state=123)
 
-    train_iter = iterators.SerialIterator(list(zip(item_descriptions, movie_ids)), batch_size, shuffle=True)
+    item_factors = [mf.item_factors[:, i].T for i in movie_ids]
+    train_iter = iterators.SerialIterator(list(zip(item_descriptions, item_factors)), batch_size, shuffle=True)
     optimizer = optimizers.Adam()
     optimizer.setup(model)
 

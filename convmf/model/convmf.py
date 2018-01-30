@@ -53,7 +53,7 @@ class ConvMF(chainer.Chain):
 
     def __call__(self, x, y=None, train=True):
         if train:
-            return self.convolution(x=x, t=self.mf.item_factors[:, y].T, train=True)
+            return self.convolution(x=x, t=y, train=True)
         return self.convolution(x=x, train=False)
 
     def predict(self, users: List[int], items: List[int]) -> List[float]:
