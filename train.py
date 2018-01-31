@@ -79,7 +79,7 @@ def train_convmf(batch_size: int, n_epoch: int, n_sub_epoch: int, gpu: int, n_ou
         chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
         model.to_gpu()  # Copy the model to the GPU
 
-    train_ratings, test_ratings = train_test_split(ratings, test_size=1000, random_state=123)
+    train_ratings, test_ratings = train_test_split(ratings, test_size=10000, random_state=123)
 
     item_factors = [mf.item_factors[:, i].T for i in movie_ids]
     train_iter = iterators.SerialIterator(list(zip(item_descriptions, item_factors)), batch_size, shuffle=True)

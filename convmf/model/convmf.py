@@ -53,7 +53,9 @@ class ConvMF(chainer.Chain):
 
     def __call__(self, x, y=None, train=True):
         if train:
-            return self.convolution(x=x, t=y, train=True)
+            loss = self.convolution(x=x, t=y, train=True)
+            chainer.reporter.report({'loss': loss}, self)
+            return loss
         return self.convolution(x=x, train=False)
 
     def predict(self, users: List[int], items: List[int]) -> List[float]:
