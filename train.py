@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from chainer import training, iterators, optimizers, serializers
 from chainer.training import extensions
+from datetime import datetime
 from gensim.corpora.dictionary import Dictionary
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
@@ -78,10 +79,11 @@ def train_convmf(batch_size: int, n_epoch: int, n_sub_epoch: int, gpu: int, n_ou
         chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
         model.to_gpu()  # Copy the model to the GPU
 
-    train_ratings, test_ratings = train_test_split(ratings, test_size=0.1, random_state=123)
+    train_ratings, test_ratings = train_test_split(ratings, test_size=1000, random_state=123)
 
     item_factors = [mf.item_factors[:, i].T for i in movie_ids]
     train_iter = iterators.SerialIterator(list(zip(item_descriptions, item_factors)), batch_size, shuffle=True)
+    # test_iter = iterators.SerialIterator(list(zip(item_descriptions, test_users, test_items)), batch_size, shuffle=False)
     optimizer = optimizers.Adam()
     optimizer.setup(model)
 
@@ -99,17 +101,18 @@ def train_convmf(batch_size: int, n_epoch: int, n_sub_epoch: int, gpu: int, n_ou
     for n in range(0, n_epoch, n_sub_epoch):
         trainer.run()
         with chainer.using_config('train', False):
-            print('calculate item factors')
-            item_factors = model.get_item_factors(items=[r.item for r in test_ratings])
-            print('get user factors')
-            user_factors = [mf.user_factors[u] for u in [r.user for r in test_ratings]]
-            print('calculate rmse')
-            predictions = [np.inner(u, i) for u, i in zip(user_factors, item_factors)]
-            rmse = np.sqrt(np.mean(np.square(predictions - np.array([r.rating for r in test_ratings]))))
+            error = 0
+            print(datetime.now())
+            for i in range(0, len(test_ratings), batch_size):
+                predictions = model.predict(users=[r.user for r in test_ratings[i:i+batch_size]], items=[r.item for r in test_ratings[i:i+batch_size]])
+                error += model.xp.sum(model.xp.square(predictions - model.xp.array([r.rating for r in test_ratings[i:i+batch_size]], dtype=np.int32)))
+            print(datetime.now())
+
+            rmse = model.xp.sqrt(error / len(test_ratings))
             print('rmse: %.4f' % rmse)
-        if gpu >= 0:
-            chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
-            model.to_gpu()  # Copy the model to the GPU
+        # if gpu >= 0:
+        #     chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
+        #     model.to_gpu()  # Copy the model to the GPU
 
     model.to_cpu()
     serializers.save_npz('./result/convmf.npz', model)
@@ -149,8 +152,8 @@ if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=50)
-    parser.add_argument('--n_epoch', type=int, default=50)
-    parser.add_argument('--n_sub_epoch', type=int, default=10)
+    parser.add_argument('--n_epoch', type=int, default=1)
+    parser.add_argument('--n_sub_epoch', type=int, default=1)
     parser.add_argument('--gpu', type=int, default=-1)
     parser.add_argument('--n_out_channel', type=int, default=1)
     args = parser.parse_args()
