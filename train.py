@@ -1,5 +1,5 @@
 # coding: utf-8
-
+import argparse
 import os
 import pickle
 from typing import List
@@ -49,17 +49,11 @@ def make_item_descriptions(max_sentence_length=None):
     return descriptions.id.values, texts.values, len(dictionary.keys()) + 1
 
 
-def train_convmf():
-    batch_size = 50
-    n_epoch = 50
-    n_sub_epoch = 10
-    gpu = 0
-
+def train_convmf(batch_size: int, n_epoch: int, n_sub_epoch: int, gpu: int, n_out_channel: int):
     ratings = make_rating_data()
     filter_windows = [3, 4, 5]
     max_sentence_length = 300
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
-    n_out_channel = 2
     n_factor = 300
     dropout_ratio = 0.5
     user_lambda = 10
@@ -98,7 +92,6 @@ def train_convmf():
         extensions.PrintReport(entries=[
             'epoch',
             'main/loss',
-            'test/main/loss',
             'elapsed_time']))
     trainer.extend(extensions.ProgressBar())
     # trainer.extend(ConvMFUpdater(model))
@@ -106,9 +99,13 @@ def train_convmf():
     for n in range(0, n_epoch, n_sub_epoch):
         trainer.run()
         with chainer.using_config('train', False):
-            model.to_cpu()
-            predict = model.predict(users=[r.user for r in test_ratings], items=[r.item for r in test_ratings])
-            rmse = np.sqrt(np.mean(np.square(predict - np.array([r.rating for r in test_ratings]))))
+            print('calculate item factors')
+            item_factors = model.get_item_factors(items=[r.item for r in test_ratings])
+            print('get user factors')
+            user_factors = [mf.user_factors[u] for u in [r.user for r in test_ratings]]
+            print('calculate rmse')
+            predictions = [np.inner(u, i) for u, i in zip(user_factors, item_factors)]
+            rmse = np.sqrt(np.mean(np.square(predictions - np.array([r.rating for r in test_ratings]))))
             print('rmse: %.4f' % rmse)
         if gpu >= 0:
             chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
@@ -150,4 +147,12 @@ def train_mf():
 
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
-    train_convmf()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--batch_size', type=int, default=50)
+    parser.add_argument('--n_epoch', type=int, default=50)
+    parser.add_argument('--n_sub_epoch', type=int, default=10)
+    parser.add_argument('--gpu', type=int, default=-1)
+    parser.add_argument('--n_out_channel', type=int, default=1)
+    args = parser.parse_args()
+    print(args)
+    train_convmf(**vars(args))
