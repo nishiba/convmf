@@ -100,6 +100,8 @@ def train_convmf(batch_size: int, n_epoch: int, n_sub_epoch: int, gpu: int, n_ou
 
     for n in range(0, n_epoch, n_sub_epoch):
         trainer.run()
+        if gpu >= 0:
+            model.to_cpu()
         with chainer.using_config('train', False):
             error = 0
             print(datetime.now())
@@ -110,9 +112,9 @@ def train_convmf(batch_size: int, n_epoch: int, n_sub_epoch: int, gpu: int, n_ou
 
             rmse = model.xp.sqrt(error / len(test_ratings))
             print('rmse: %.4f' % rmse)
-        # if gpu >= 0:
-        #     chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
-        #     model.to_gpu()  # Copy the model to the GPU
+        if gpu >= 0:
+            chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
+            model.to_gpu()  # Copy the model to the GPU
 
     model.to_cpu()
     serializers.save_npz('./result/convmf.npz', model)
