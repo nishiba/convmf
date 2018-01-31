@@ -63,7 +63,7 @@ class ConvMF(chainer.Chain):
         return predictions
 
     def get_item_factors(self, items: List[int]) -> List[np.ndarray]:
-        item_factors = self.convolution(x=np.array([self.item_descriptions[i] for i in items]), train=False)
+        item_factors = self.convolution(x=chainer.cuda.to_gpu(np.array([self.item_descriptions[i] for i in items])), train=False)
         return [chainer.cuda.to_cpu(i.data) for i in item_factors]
 
     def fit_mf(self, n_trial=3):
