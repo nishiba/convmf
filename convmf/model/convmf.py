@@ -30,51 +30,42 @@ class ConvMF(chainer.Chain):
                  ratings: List[RatingData],
                  filter_windows: List[int],
                  max_sentence_length: int,
-                 item_descriptions: List[np.ndarray],
                  n_word,
                  n_out_channel=100,
                  dropout_ratio=0.5,
                  n_factor=300,
-                 user_lambda=0.001,
-                 item_lambda=0.001,
-                 mf: MatrixFactorization = None):
+                 user_lambda=10,
+                 item_lambda=100):
         super(ConvMF, self).__init__()
         self.n_factor = n_factor
-        self.item_descriptions = item_descriptions
-        n_item = max(max([x.item for x in ratings]), len(item_descriptions))  # TODO(nishiba) fix.
-        self.mf = mf
-        if self.mf is None:
-            self.mf = MatrixFactorization(ratings=ratings, n_factor=n_factor, user_lambda=user_lambda, item_lambda=item_lambda, n_item=n_item)
+        self.user_lambda = user_lambda
+        self.item_lambda = item_lambda
+        n_item = max([x.item for x in ratings]) + 1
+        n_user = max([x.user for x in ratings]) + 1
 
         # model architecture
         with self.init_scope():
+            self.user_factor = links.EmbedID(n_user, self.n_factor)
+            self.item_factor = links.EmbedID(n_item, self.n_factor)
             self.convolution = CNNRand(filter_windows=filter_windows, max_sentence_length=max_sentence_length, n_word=n_word, n_factor=n_factor,
                                        n_out_channel=n_out_channel, n_class=n_factor, dropout_ratio=dropout_ratio, mode=TaskType.Embedding)
 
-    def __call__(self, x, y=None, train=True):
-        if train:
-            loss = self.convolution(x=x, t=y, train=True)
+    def __call__(self, user, description, item=None, ratings=None):
+        user_factor = self.user_factor(user)
+
+        if chainer.config.train:
+            item_factor = self.item_factor(item)
+            approximates = functions.matmul(functions.expand_dims(user_factor, axis=1),
+                                            functions.expand_dims(item_factor, axis=1),
+                                            transb=True)
+            error = functions.mean_squared_error(functions.expand_dims(ratings, axis=1), approximates)
+            user_weight = functions.sum(functions.square(user_factor))
+
+            item_error = self.convolution(x=description, t=item_factor, train=True)
+            loss = error + self.user_lambda * user_weight + self.item_lambda * item_error
             chainer.reporter.report({'loss': loss}, self)
             return loss
-        return self.convolution(x=x, train=False)
 
-    def predict(self, users: List[int], items: List[int]) -> List[float]:
-        item_factors = self.convolution(x=np.array([self.item_descriptions[i] for i in items]), train=False)
-        user_factors = [self.mf.user_factors[:, u] for u in users]
-        predictions = [self.xp.inner(u, i.data) for u, i in zip(user_factors, item_factors)]
-        return predictions
+        convolution_item_factor = self.convolution(x=description, train=False)
+        return functions.matmul(user_factor, convolution_item_factor, transb=True)
 
-    def get_item_factors(self, items: List[int]) -> List[np.ndarray]:
-        item_factors = self.convolution(x=np.array([self.item_descriptions[i] for i in items]), train=False)
-        return [i.data for i in item_factors]
-
-    def fit_mf(self, n_trial=3):
-        self.mf.fit(n_trial=n_trial)
-
-    def update_latent_factor(self, n_trial=3):
-        # TODO(nishiba) must make 'train' off
-        self.mf.fit(n_trial=n_trial, additional=self._embedding())
-        # TODO(nishiba) must make 'train' on
-
-    def _embedding(self):
-        return [self.convolution(x=np.array([d]), train=False)[0].data for d in self.item_descriptions]

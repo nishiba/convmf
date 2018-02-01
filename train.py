@@ -50,7 +50,15 @@ def make_item_descriptions(max_sentence_length=None):
     return descriptions.id.values, texts.values, len(dictionary.keys()) + 1
 
 
-def train_convmf(batch_size: int, n_epoch: int, n_sub_epoch: int, gpu: int, n_out_channel: int):
+def make_zip(ratings, item_descriptions):
+    users = np.array([rating.user for rating in ratings], dtype=np.int32)
+    items = np.array([rating.item for rating in ratings], dtype=np.int32)
+    descriptions = np.array([item_descriptions[i] for i in items], dtype=np.int32)
+    rates = np.array([rating.rating for rating in ratings], dtype=np.float32).reshape((-1, 1))
+    return list(zip(users, descriptions, iterators, rates))
+
+
+def train_convmf(batch_size: int, n_epoch: int, gpu: int, n_out_channel: int):
     ratings = make_rating_data()
     filter_windows = [3, 4, 5]
     max_sentence_length = 300
@@ -60,62 +68,39 @@ def train_convmf(batch_size: int, n_epoch: int, n_sub_epoch: int, gpu: int, n_ou
     user_lambda = 10
     item_lambda = 100
 
-    with open('./result/mf.pkl', 'rb') as f:
-        mf = pickle.load(f)
-
     model = ConvMF(ratings=ratings,
                    filter_windows=filter_windows,
                    max_sentence_length=max_sentence_length,
                    n_word=n_word,
-                   item_descriptions=item_descriptions,
                    n_out_channel=n_out_channel,
                    dropout_ratio=dropout_ratio,
                    n_factor=n_factor,
                    user_lambda=user_lambda,
-                   item_lambda=item_lambda,
-                   mf=mf)
+                   item_lambda=item_lambda)
 
     if gpu >= 0:
         chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
         model.to_gpu()  # Copy the model to the GPU
 
-    train_ratings, test_ratings = train_test_split(ratings, test_size=1000, random_state=123)
+    train_ratings, test_ratings = train_test_split(make_zip(ratings, item_descriptions), test_size=0.1, random_state=123)
 
-    item_factors = [mf.item_factors[:, i].T for i in movie_ids]
-    # test_iter = iterators.SerialIterator(list(zip(item_descriptions, test_users, test_items)), batch_size, shuffle=False)
     optimizer = optimizers.Adam()
     optimizer.setup(model)
-    train_iter = iterators.SerialIterator(list(zip(item_descriptions, item_factors)), batch_size, shuffle=True)
+    train_iter = iterators.SerialIterator(train_ratings, batch_size, shuffle=True)
+    test_iter = iterators.SerialIterator(test_ratings, batch_size, shuffle=False)
 
-    # trainer.extend(ConvMFUpdater(model))
-
-    for n in range(0, n_epoch, n_sub_epoch):
-        updater = training.StandardUpdater(train_iter, optimizer, device=gpu)
-        trainer = training.Trainer(updater, (n_sub_epoch, 'epoch'), out='result')
-        trainer.extend(extensions.LogReport(log_name='log_%d' % n))
-        trainer.extend(
-            extensions.PrintReport(entries=[
-                'epoch',
-                'main/loss',
-                'elapsed_time']))
-        trainer.extend(extensions.ProgressBar())
-        trainer.run()
-        train_iter.reset()
-        if gpu >= 0:
-            model.to_cpu()
-        with chainer.using_config('train', False):
-            error = 0
-            print(datetime.now())
-            for i in range(0, len(test_ratings), batch_size):
-                predictions = model.predict(users=[r.user for r in test_ratings[i:i+batch_size]], items=[r.item for r in test_ratings[i:i+batch_size]])
-                print(test_ratings[i], predictions[0])
-                error += np.sum(np.square(predictions - np.array([r.rating for r in test_ratings[i:i+batch_size]])))
-            print(datetime.now())
-            rmse = np.sqrt(error / len(test_ratings))
-            print('rmse: %.4f' % rmse)
-        if gpu >= 0:
-            chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
-            model.to_gpu()  # Copy the model to the GPU
+    updater = training.StandardUpdater(train_iter, optimizer, device=gpu)
+    trainer = training.Trainer(updater, (n_epoch, 'epoch'), out='result')
+    trainer.extend(extensions.Evaluator(test_iter, model, device=gpu), name='test')
+    trainer.extend(extensions.LogReport())
+    trainer.extend(
+        extensions.PrintReport(entries=[
+            'epoch',
+            'main/loss',
+            'test/main/loss',
+            'elapsed_time']))
+    trainer.extend(extensions.ProgressBar())
+    trainer.run()
 
     model.to_cpu()
     serializers.save_npz('./result/convmf.npz', model)
@@ -156,7 +141,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=50)
     parser.add_argument('--n_epoch', type=int, default=10)
-    parser.add_argument('--n_sub_epoch', type=int, default=1)
     parser.add_argument('--gpu', type=int, default=-1)
     parser.add_argument('--n_out_channel', type=int, default=1)
     args = parser.parse_args()
