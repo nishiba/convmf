@@ -55,7 +55,7 @@ def make_zip(ratings, item_descriptions):
     items = np.array([rating.item for rating in ratings], dtype=np.int32)
     descriptions = np.array([item_descriptions[i] for i in items], dtype=np.int32)
     rates = np.array([rating.rating for rating in ratings], dtype=np.float32).reshape((-1, 1))
-    return list(zip(users, descriptions, iterators, rates))
+    return list(zip(users, descriptions, items, rates))
 
 
 def train_convmf(batch_size: int, n_epoch: int, gpu: int, n_out_channel: int):
