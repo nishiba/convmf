@@ -33,7 +33,7 @@ def make_item_descriptions(max_sentence_length=None):
     texts = descriptions.description
     texts = texts.apply(lambda x: x.strip().split())
     dictionary = Dictionary(texts.values)
-    dictionary.filter_extremes()
+    dictionary.filter_extremes(keep_n=8000)
     eos_id = len(dictionary.keys())
 
     # to index list
@@ -66,12 +66,11 @@ def make_cnn_data(ratings, item_descriptions):
 
 
 def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int, n_out_channel: int,
-                 user_lambda: float, item_lambda: float):
+                 user_lambda: float, item_lambda: float, n_factor: int):
     ratings = make_rating_data()
     filter_windows = [3, 4, 5]
     max_sentence_length = 300
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
-    n_factor = 300
     dropout_ratio = 0.5
 
     mf = ConvMF(ratings=ratings,
@@ -125,7 +124,6 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     trainer.extend(extensions.ProgressBar())
     trainer.run()
     train_iter['cnn'].reset()
-    mf.use_cnn = True
 
     # train alternately
     mf.update_convolution_item_factor(cnn)
@@ -230,6 +228,7 @@ if __name__ == '__main__':
     parser.add_argument('--n-out-channel', type=int, default=100)
     parser.add_argument('--user-lambda', type=float, default=10)
     parser.add_argument('--item-lambda', type=float, default=100)
+    parser.add_argument('--n-factor', type=float, default=200)
     args = parser.parse_args()
     print(args)
     train_convmf(**vars(args))
