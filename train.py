@@ -60,7 +60,7 @@ def make_mf_data(ratings):
 
 
 def make_cnn_data(ratings, item_descriptions):
-    items = np.array([rating.item for rating in ratings], dtype=np.int32)
+    items = np.array(list(set([rating.item for rating in ratings])), dtype=np.int32)
     descriptions = np.array([item_descriptions[i] for i in items], dtype=np.int32)
     return list(zip(descriptions, items))
 
