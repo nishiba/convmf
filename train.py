@@ -7,22 +7,24 @@ from typing import List
 import chainer
 import numpy as np
 import pandas as pd
-from chainer import training, iterators, optimizers, serializers
+from chainer import training, iterators, serializers
 from chainer.training import extensions
 from datetime import datetime
 from gensim.corpora.dictionary import Dictionary
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
-from convmf.model.convmf import ConvMF, ConvMFUpdater
+from convmf.model.convmf import ConvMF, ConvMFUpdater, CNNRand
 from convmf.model.matrix_factorization import RatingData, MatrixFactorization
 
 
-def make_rating_data() -> List[RatingData]:
+def make_rating_data(size: int = None) -> List[RatingData]:
     ratings = pd.read_csv(os.path.join('data', 'ratings.csv')).rename(columns={'movie': 'item'})
     ratings.user = ratings.user.astype(np.int32)
     ratings.item = ratings.item.astype(np.int32)
     ratings.rating = ratings.rating.astype(np.float32)
+    if size is not None:
+        ratings = ratings.head(size)
     return [RatingData(*t) for t in ratings.itertuples(index=False)]
 
 
@@ -47,63 +49,82 @@ def make_item_descriptions(max_sentence_length=None):
     texts = texts.apply(lambda x: x.astype(np.int32))
     descriptions.id = descriptions.id.astype(np.int32)
 
-    return descriptions.id.values, texts.values, len(dictionary.keys()) + 1
+    return np.array(list(descriptions.id.values)), np.array(list(texts.values)), len(dictionary.keys()) + 1
 
 
-def make_zip(ratings, item_descriptions):
+def make_mf_data(ratings):
     users = np.array([rating.user for rating in ratings], dtype=np.int32)
     items = np.array([rating.item for rating in ratings], dtype=np.int32)
-    descriptions = np.array([item_descriptions[i] for i in items], dtype=np.int32)
     rates = np.array([rating.rating for rating in ratings], dtype=np.float32).reshape((-1, 1))
-    return list(zip(users, descriptions, items, rates))
+    return list(zip(users, items, rates))
+
+
+def make_cnn_data(ratings, item_descriptions):
+    items = np.array([rating.item for rating in ratings], dtype=np.int32)
+    descriptions = np.array([item_descriptions[i] for i in items], dtype=np.int32)
+    return list(zip(descriptions, items))
 
 
 def train_convmf(batch_size: int, n_epoch: int, gpu: int, n_out_channel: int):
     ratings = make_rating_data()
     filter_windows = [3, 4, 5]
-    max_sentence_length = 300
+    max_sentence_length = 30
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
     n_factor = 300
     dropout_ratio = 0.5
     user_lambda = 10
     item_lambda = 100
 
-    model = ConvMF(ratings=ratings,
-                   filter_windows=filter_windows,
-                   max_sentence_length=max_sentence_length,
-                   n_word=n_word,
-                   n_out_channel=n_out_channel,
-                   dropout_ratio=dropout_ratio,
-                   n_factor=n_factor,
-                   user_lambda=user_lambda,
-                   item_lambda=item_lambda)
+    mf = ConvMF(ratings=ratings,
+                n_factor=n_factor,
+                user_lambda=user_lambda,
+                item_lambda=item_lambda,
+                descriptions=item_descriptions)
+
+    cnn = CNNRand(filter_windows=filter_windows,
+                  max_sentence_length=max_sentence_length,
+                  n_word=n_word,
+                  n_out_channel=n_out_channel,
+                  dropout_ratio=dropout_ratio,
+                  n_factor=n_factor)
 
     if gpu >= 0:
         chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
-        model.to_gpu()  # Copy the model to the GPU
+        mf.to_gpu()  # Copy the model to the GPU
+        cnn.to_gpu()  # Copy the model to the GPU
 
-    train_ratings, test_ratings = train_test_split(make_zip(ratings, item_descriptions), test_size=0.1, random_state=123)
+    cnn.update_item_factors(mf.item_factor.W.data)
+    mf.update_convolution_item_factor(cnn)
+    train_mf, test_mf = train_test_split(make_mf_data(ratings), test_size=0.1, random_state=123)
+    train_cnn, test_cnn = train_test_split(make_cnn_data(ratings, item_descriptions), test_size=0.1, random_state=123)
 
-    optimizer = optimizers.Adam()
-    optimizer.setup(model)
-    train_iter = iterators.SerialIterator(train_ratings, batch_size, shuffle=True)
-    test_iter = iterators.SerialIterator(test_ratings, batch_size, shuffle=False)
+    optimizers = {'mf': chainer.optimizers.Adam(), 'cnn': chainer.optimizers.Adam()}
+    optimizers['mf'].setup(mf)
+    optimizers['cnn'].setup(cnn)
 
-    updater = training.StandardUpdater(train_iter, optimizer, device=gpu)
+    train_iter = {'mf': iterators.SerialIterator(train_mf, batch_size, shuffle=True),
+                  'cnn': iterators.SerialIterator(train_cnn, batch_size, shuffle=True)}
+    test_iter = {'mf': iterators.SerialIterator(test_mf, batch_size, repeat=False),
+                 'cnn': iterators.SerialIterator(test_cnn, batch_size, repeat=False)}
+
+    updater = ConvMFUpdater(train_iter, optimizers, mf=mf, cnn=cnn, device=gpu)
     trainer = training.Trainer(updater, (n_epoch, 'epoch'), out='result')
-    trainer.extend(extensions.Evaluator(test_iter, model, device=gpu), name='test')
+    trainer.extend(extensions.Evaluator(test_iter['mf'], mf, device=gpu), name='test/mf')
+    trainer.extend(extensions.Evaluator(test_iter['cnn'], cnn, device=gpu), name='test/cnn')
     trainer.extend(extensions.LogReport())
     trainer.extend(
         extensions.PrintReport(entries=[
             'epoch',
-            'main/loss',
-            'test/main/loss',
+            'mf/loss',
+            'test/mf/main/loss',
+            'cnn/loss',
+            'test/cnn/main/loss',
             'elapsed_time']))
     trainer.extend(extensions.ProgressBar())
     trainer.run()
 
-    model.to_cpu()
-    serializers.save_npz('./result/convmf.npz', model)
+    mf.to_cpu()
+    serializers.save_npz('./result/convmf.npz', mf)
 
 
 def make_negative_test_case(ratings: List[RatingData], size: int) -> List[RatingData]:
@@ -116,25 +137,24 @@ def make_negative_test_case(ratings: List[RatingData], size: int) -> List[Rating
     return [RatingData(user=u, item=i, rating=0) for u, i in negative_cases]
 
 
-def train_mf():
-    ratings = make_rating_data()
-    n_factor = 300
-    n_trial = 10
-    user_lambda = 10
-    item_lambda = 100
-
-    n_item = len(pd.DataFrame(ratings).item.unique())
-    train, test = train_test_split(ratings, test_size=0.1, random_state=123)
-    model = MatrixFactorization(ratings=train, n_factor=n_factor, user_lambda=user_lambda, item_lambda=item_lambda, n_item=n_item)
-    for n in range(n_trial):
-        model.fit(n_trial=1)
-        predict = model.predict(users=[r.user for r in test], items=[r.item for r in test])
-        rmse = np.sqrt(np.mean(np.square(predict - np.array([r.rating for r in test]))))
-        print('rmse: %.4f' % rmse)
-
-    with open('./result/mf.pkl', 'wb') as f:
-        pickle.dump(model, f)
-
+# def train_mf():
+#     ratings = make_rating_data()
+#     n_factor = 300
+#     n_trial = 10
+#     user_lambda = 10
+#     item_lambda = 100
+#
+#     n_item = len(pd.DataFrame(ratings).item.unique())
+#     train, test = train_test_split(ratings, test_size=0.1, random_state=123)
+#     model = MatrixFactorization(ratings=train, n_factor=n_factor, user_lambda=user_lambda, item_lambda=item_lambda, n_item=n_item)
+#     for n in range(n_trial):
+#         model.fit(n_trial=1)
+#         predict = model.predict(users=[r.user for r in test], items=[r.item for r in test])
+#         rmse = np.sqrt(np.mean(np.square(predict - np.array([r.rating for r in test]))))
+#         print('rmse: %.4f' % rmse)
+#
+#     with open('./result/mf.pkl', 'wb') as f:
+#         pickle.dump(model, f)
 
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
