@@ -113,6 +113,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     trainer.extend(extensions.ProgressBar())
     trainer.run()
     train_iter['mf'].reset()
+    mf.use_cnn = True
 
     # train alternately
     cnn.update_item_factors(mf.item_factor.W.data)
