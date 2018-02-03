@@ -63,6 +63,21 @@ class ConvMF(chainer.Chain):
             for i in range(0, len(self.descriptions), batch_size):
                 self.convolution_item_factor[i:i + batch_size] = cnn(x=self.descriptions[i:i + batch_size]).data
 
+    def to_cpu(self):
+        super(ConvMF, self).to_cpu()
+        from chainer.backends import cuda
+        self.descriptions = cuda.to_cpu(self.descriptions)
+        self.convolution_item_factor = cuda.to_cpu(self.convolution_item_factor)
+        return self
+
+    def to_gpu(self, device=None):
+        from chainer.backends import cuda
+        with cuda._get_device(device):
+            super(ConvMF, self).to_gpu()
+            self.descriptions = cuda.to_gpu(self.descriptions, device=device)
+            self.convolution_item_factor = cuda.to_gpu(self.convolution_item_factor, device=device)
+        return self
+
 
 class ConvolutionList(chainer.ChainList):
     def __init__(self, n_in_channel: int, n_out_channel: int, n_factor: int, filter_windows: List[int]):
