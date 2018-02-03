@@ -211,7 +211,6 @@ class ConvMFUpdater(chainer.training.Updater):
 
     def update_core(self):
         if self.is_new_epoch:
-            print(self.current_name)
             self._switch()
         # update
         self._update_core(self.current_name)

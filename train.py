@@ -125,6 +125,8 @@ def train_convmf(batch_size: int, n_epoch: int, gpu: int, n_out_channel: int):
 
     mf.to_cpu()
     serializers.save_npz('./result/convmf.npz', mf)
+    cnn.to_cpu()
+    serializers.save_npz('./result/cnn.npz', cnn)
 
 
 def make_negative_test_case(ratings: List[RatingData], size: int) -> List[RatingData]:
