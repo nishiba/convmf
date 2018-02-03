@@ -65,15 +65,14 @@ def make_cnn_data(ratings, item_descriptions):
     return list(zip(descriptions, items))
 
 
-def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int, n_out_channel: int):
+def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int, n_out_channel: int,
+                 user_lambda:float, item_lambda: float):
     ratings = make_rating_data()
     filter_windows = [3, 4, 5]
     max_sentence_length = 30
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
     n_factor = 300
     dropout_ratio = 0.5
-    user_lambda = 10
-    item_lambda = 100
 
     mf = ConvMF(ratings=ratings,
                 n_factor=n_factor,
@@ -165,7 +164,9 @@ if __name__ == '__main__':
     parser.add_argument('--cnn-batch-size', type=int, default=64)
     parser.add_argument('--n-epoch', type=int, default=10)
     parser.add_argument('--gpu', type=int, default=-1)
-    parser.add_argument('--n-out-channel', type=int, default=1)
+    parser.add_argument('--n-out-channel', type=int, default=100)
+    parser.add_argument('--user-lambda', type=float, default=10)
+    parser.add_argument('--item-lambda', type=float, default=100)
     args = parser.parse_args()
     print(args)
     train_convmf(**vars(args))
