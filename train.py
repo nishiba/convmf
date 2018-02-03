@@ -65,7 +65,7 @@ def make_cnn_data(ratings, item_descriptions):
     return list(zip(descriptions, items))
 
 
-def train_convmf(batch_size: int, n_epoch: int, gpu: int, n_out_channel: int):
+def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int, n_out_channel: int):
     ratings = make_rating_data()
     filter_windows = [3, 4, 5]
     max_sentence_length = 30
@@ -102,10 +102,10 @@ def train_convmf(batch_size: int, n_epoch: int, gpu: int, n_out_channel: int):
     optimizers['mf'].setup(mf)
     optimizers['cnn'].setup(cnn)
 
-    train_iter = {'mf': iterators.SerialIterator(train_mf, batch_size, shuffle=True),
-                  'cnn': iterators.SerialIterator(train_cnn, batch_size, shuffle=True)}
-    test_iter = {'mf': iterators.SerialIterator(test_mf, batch_size, repeat=False),
-                 'cnn': iterators.SerialIterator(test_cnn, batch_size, repeat=False)}
+    train_iter = {'mf': iterators.SerialIterator(train_mf, mf_batch_size, shuffle=True),
+                  'cnn': iterators.SerialIterator(train_cnn, cnn_batch_size, shuffle=True)}
+    test_iter = {'mf': iterators.SerialIterator(test_mf, mf_batch_size, repeat=False),
+                 'cnn': iterators.SerialIterator(test_cnn, cnn_batch_size, repeat=False)}
 
     updater = ConvMFUpdater(train_iter, optimizers, mf=mf, cnn=cnn, device=gpu)
     trainer = training.Trainer(updater, (n_epoch, 'epoch'), out='result')
@@ -161,10 +161,11 @@ def make_negative_test_case(ratings: List[RatingData], size: int) -> List[Rating
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', type=int, default=50)
-    parser.add_argument('--n_epoch', type=int, default=10)
+    parser.add_argument('--mf-batch-size', type=int, default=1024)
+    parser.add_argument('--cnn-batch-size', type=int, default=64)
+    parser.add_argument('--n-epoch', type=int, default=10)
     parser.add_argument('--gpu', type=int, default=-1)
-    parser.add_argument('--n_out_channel', type=int, default=1)
+    parser.add_argument('--n-out-channel', type=int, default=1)
     args = parser.parse_args()
     print(args)
     train_convmf(**vars(args))
