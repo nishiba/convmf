@@ -132,7 +132,7 @@ class ConvMFUpdater(chainer.training.Updater):
         self.device = device
         self.iteration = 0
         self.converter = convert.concat_examples
-        self.current_name = 'mf'
+        self.current_name = 'cnn'
         self.mf = mf
         self.cnn = cnn
 
