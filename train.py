@@ -104,48 +104,44 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
                  'cnn': iterators.SerialIterator(test_cnn, cnn_batch_size, repeat=False)}
 
     # pre-train mf
-    updater = training.StandardUpdater(train_iter['mf'], optimizers['mf'], device=gpu)
-    trainer = training.Trainer(updater, (10, 'epoch'), out='result')
-    trainer.extend(extensions.Evaluator(test_iter['mf'], mf, device=gpu), name='test')
-    trainer.extend(extensions.LogReport())
-    trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
-    trainer.extend(extensions.ProgressBar())
-    trainer.run()
-    train_iter['mf'].reset()
+    def _train_mf():
+        updater = training.StandardUpdater(train_iter['mf'], optimizers['mf'], device=gpu)
+        trainer = training.Trainer(updater, (10, 'epoch'), out='result')
+        trainer.extend(extensions.Evaluator(test_iter['mf'], mf, device=gpu), name='test')
+        trainer.extend(extensions.LogReport())
+        trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
+        trainer.extend(extensions.ProgressBar())
+        trainer.run()
+        train_iter['mf'].reset()
+
+    _train_mf()
     mf.use_cnn = True
 
     # pre-train cnn
+    def _train_cnn():
+        updater = training.StandardUpdater(train_iter['cnn'], optimizers['cnn'], device=gpu)
+        trainer = training.Trainer(updater, (10, 'epoch'), out='result')
+        trainer.extend(extensions.Evaluator(test_iter['cnn'], cnn, device=gpu), name='test')
+        trainer.extend(extensions.LogReport())
+        trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
+        trainer.extend(extensions.ProgressBar())
+        trainer.run()
+        train_iter['cnn'].reset()
+
     cnn.update_item_factors(mf.item_factor.W.data)
-    updater = training.StandardUpdater(train_iter['cnn'], optimizers['cnn'], device=gpu)
-    trainer = training.Trainer(updater, (10, 'epoch'), out='result')
-    trainer.extend(extensions.Evaluator(test_iter['cnn'], cnn, device=gpu), name='test')
-    trainer.extend(extensions.LogReport())
-    trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
-    trainer.extend(extensions.ProgressBar())
-    trainer.run()
-    train_iter['cnn'].reset()
+    _train_cnn()
 
     # train alternately
-    mf.update_convolution_item_factor(cnn)
-    updater = ConvMFUpdater(train_iter, optimizers, mf=mf, cnn=cnn, device=gpu)
-    trainer = training.Trainer(updater, (n_epoch, 'epoch'), out='result')
-    trainer.extend(extensions.Evaluator(test_iter['mf'], mf, device=gpu), name='test/mf')
-    trainer.extend(extensions.Evaluator(test_iter['cnn'], cnn, device=gpu), name='test/cnn')
-    trainer.extend(extensions.LogReport())
-    trainer.extend(
-        extensions.PrintReport(entries=[
-            'epoch',
-            'mf/loss',
-            'test/mf/main/loss',
-            'cnn/loss',
-            'test/cnn/main/loss',
-            'elapsed_time']))
-    trainer.extend(extensions.ProgressBar())
-    trainer.run()
+    for n in range(10):
+        print('train alternately:', n)
+        mf.update_convolution_item_factor(cnn, batch_size=cnn_batch_size)
+        _train_mf()
+        cnn.update_item_factors(mf.item_factor.W.data)
+        _train_cnn()
 
     mf.to_cpu()
-    serializers.save_npz('./result/convmf.npz', mf)
     cnn.to_cpu()
+    serializers.save_npz('./result/convmf.npz', mf)
     serializers.save_npz('./result/cnn.npz', cnn)
 
 
