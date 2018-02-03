@@ -65,7 +65,7 @@ class ConvMF(chainer.Chain):
                                                 functions.expand_dims(item_factor, axis=1),
                                                 transb=True)
             loss = functions.mean_squared_error(functions.expand_dims(rating, axis=1), approximates)
-            chainer.reporter.report({'loss': loss}, self)
+            chainer.reporter.report({'loss': functions.sqrt(loss)}, self)
             return loss
 
         if self.use_cnn:

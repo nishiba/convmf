@@ -69,7 +69,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
                  user_lambda: float, item_lambda: float):
     ratings = make_rating_data()
     filter_windows = [3, 4, 5]
-    max_sentence_length = 30
+    max_sentence_length = 300
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
     n_factor = 300
     dropout_ratio = 0.5
@@ -78,7 +78,8 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
                 n_factor=n_factor,
                 user_lambda=user_lambda,
                 item_lambda=item_lambda,
-                descriptions=item_descriptions)
+                descriptions=item_descriptions,
+                use_cnn=False)
 
     cnn = CNNRand(filter_windows=filter_windows,
                   max_sentence_length=max_sentence_length,
@@ -92,11 +93,8 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
         mf.to_gpu()  # Copy the model to the GPU
         cnn.to_gpu()  # Copy the model to the GPU
 
-    cnn.update_item_factors(mf.item_factor.W.data)
-    mf.update_convolution_item_factor(cnn)
     train_mf, test_mf = train_test_split(make_mf_data(ratings), test_size=0.1, random_state=123)
     train_cnn, test_cnn = train_test_split(make_cnn_data(ratings, item_descriptions), test_size=0.1, random_state=123)
-
     optimizers = {'mf': chainer.optimizers.Adam(), 'cnn': chainer.optimizers.Adam()}
     optimizers['mf'].setup(mf)
     optimizers['cnn'].setup(cnn)
@@ -106,6 +104,19 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     test_iter = {'mf': iterators.SerialIterator(test_mf, mf_batch_size, repeat=False),
                  'cnn': iterators.SerialIterator(test_cnn, cnn_batch_size, repeat=False)}
 
+    # pre-train
+    updater = training.StandardUpdater(train_iter['mf'], optimizers['mf'], device=gpu)
+    trainer = training.Trainer(updater, (10, 'epoch'), out='result')
+    trainer.extend(extensions.Evaluator(test_iter, mf, device=gpu), name='test')
+    trainer.extend(extensions.LogReport())
+    trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
+    trainer.extend(extensions.ProgressBar())
+    trainer.run()
+    train_iter['mf'].reset()
+
+    # train alternately
+    cnn.update_item_factors(mf.item_factor.W.data)
+    mf.update_convolution_item_factor(cnn)
     updater = ConvMFUpdater(train_iter, optimizers, mf=mf, cnn=cnn, device=gpu)
     trainer = training.Trainer(updater, (n_epoch, 'epoch'), out='result')
     trainer.extend(extensions.Evaluator(test_iter['mf'], mf, device=gpu), name='test/mf')
@@ -197,28 +208,28 @@ def train_mf(batch_size: int, n_epoch: int, gpu: int, user_lambda: float, item_l
 #     with open('./result/mf.pkl', 'wb') as f:
 #         pickle.dump(model, f)
 
-# if __name__ == '__main__':
-#     os.chdir(os.path.abspath(os.path.dirname(__file__)))
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument('--mf-batch-size', type=int, default=1024)
-#     parser.add_argument('--cnn-batch-size', type=int, default=64)
-#     parser.add_argument('--n-epoch', type=int, default=10)
-#     parser.add_argument('--gpu', type=int, default=-1)
-#     parser.add_argument('--n-out-channel', type=int, default=100)
-#     parser.add_argument('--user-lambda', type=float, default=10)
-#     parser.add_argument('--item-lambda', type=float, default=100)
-#     args = parser.parse_args()
-#     print(args)
-#     train_convmf(**vars(args))
-
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch-size', type=int, default=1024)
+    parser.add_argument('--mf-batch-size', type=int, default=1024)
+    parser.add_argument('--cnn-batch-size', type=int, default=64)
     parser.add_argument('--n-epoch', type=int, default=10)
     parser.add_argument('--gpu', type=int, default=-1)
+    parser.add_argument('--n-out-channel', type=int, default=100)
     parser.add_argument('--user-lambda', type=float, default=10)
     parser.add_argument('--item-lambda', type=float, default=100)
     args = parser.parse_args()
     print(args)
-    train_mf(**vars(args))
+    train_convmf(**vars(args))
+
+# if __name__ == '__main__':
+#     os.chdir(os.path.abspath(os.path.dirname(__file__)))
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument('--batch-size', type=int, default=1024)
+#     parser.add_argument('--n-epoch', type=int, default=10)
+#     parser.add_argument('--gpu', type=int, default=-1)
+#     parser.add_argument('--user-lambda', type=float, default=10)
+#     parser.add_argument('--item-lambda', type=float, default=100)
+#     args = parser.parse_args()
+#     print(args)
+#     train_mf(**vars(args))
