@@ -105,7 +105,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
 
     # pre-train mf
     updater = training.StandardUpdater(train_iter['mf'], optimizers['mf'], device=gpu)
-    trainer = training.Trainer(updater, (20, 'epoch'), out='result')
+    trainer = training.Trainer(updater, (10, 'epoch'), out='result')
     trainer.extend(extensions.Evaluator(test_iter['mf'], mf, device=gpu), name='test')
     trainer.extend(extensions.LogReport())
     trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
@@ -117,7 +117,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     # pre-train cnn
     cnn.update_item_factors(mf.item_factor.W.data)
     updater = training.StandardUpdater(train_iter['cnn'], optimizers['cnn'], device=gpu)
-    trainer = training.Trainer(updater, (20, 'epoch'), out='result')
+    trainer = training.Trainer(updater, (10, 'epoch'), out='result')
     trainer.extend(extensions.Evaluator(test_iter['cnn'], cnn, device=gpu), name='test')
     trainer.extend(extensions.LogReport())
     trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
