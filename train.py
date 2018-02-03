@@ -116,7 +116,6 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
             'epoch',
             'mf/loss',
             'test/mf/main/loss',
-            'test/mf/main/loss2',
             'cnn/loss',
             'test/cnn/main/loss',
             'elapsed_time']))
@@ -139,6 +138,45 @@ def make_negative_test_case(ratings: List[RatingData], size: int) -> List[Rating
     return [RatingData(user=u, item=i, rating=0) for u, i in negative_cases]
 
 
+def train_mf(batch_size: int, n_epoch: int, gpu: int, user_lambda: float, item_lambda: float):
+    ratings = make_rating_data()
+    n_factor = 300
+
+    mf = ConvMF(ratings=ratings,
+                n_factor=n_factor,
+                user_lambda=user_lambda,
+                item_lambda=item_lambda,
+                descriptions=[])
+
+    if gpu >= 0:
+        chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
+        mf.to_gpu()  # Copy the model to the GPU
+
+    train_mf, test_mf = train_test_split(make_mf_data(ratings), test_size=0.1, random_state=123)
+
+    optimizer = chainer.optimizers.Adam()
+    optimizer.setup(mf)
+
+    train_iter = iterators.SerialIterator(train_mf, batch_size, shuffle=True)
+    test_iter = iterators.SerialIterator(test_mf, batch_size, repeat=False)
+
+    updater = training.StandardUpdater(train_iter, optimizer, device=gpu)
+    trainer = training.Trainer(updater, (n_epoch, 'epoch'), out='result')
+    trainer.extend(extensions.Evaluator(test_iter, mf, device=gpu), name='test')
+    trainer.extend(extensions.LogReport())
+    trainer.extend(
+        extensions.PrintReport(entries=[
+            'epoch',
+            'main/loss',
+            'test/main/loss',
+            'elapsed_time']))
+    trainer.extend(extensions.ProgressBar())
+    trainer.run()
+
+    mf.to_cpu()
+    serializers.save_npz('./result/mf.npz', mf)
+
+
 # def train_mf():
 #     ratings = make_rating_data()
 #     n_factor = 300
@@ -158,16 +196,28 @@ def make_negative_test_case(ratings: List[RatingData], size: int) -> List[Rating
 #     with open('./result/mf.pkl', 'wb') as f:
 #         pickle.dump(model, f)
 
+# if __name__ == '__main__':
+#     os.chdir(os.path.abspath(os.path.dirname(__file__)))
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument('--mf-batch-size', type=int, default=1024)
+#     parser.add_argument('--cnn-batch-size', type=int, default=64)
+#     parser.add_argument('--n-epoch', type=int, default=10)
+#     parser.add_argument('--gpu', type=int, default=-1)
+#     parser.add_argument('--n-out-channel', type=int, default=100)
+#     parser.add_argument('--user-lambda', type=float, default=10)
+#     parser.add_argument('--item-lambda', type=float, default=100)
+#     args = parser.parse_args()
+#     print(args)
+#     train_convmf(**vars(args))
+
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
     parser = argparse.ArgumentParser()
-    parser.add_argument('--mf-batch-size', type=int, default=1024)
-    parser.add_argument('--cnn-batch-size', type=int, default=64)
+    parser.add_argument('--batch-size', type=int, default=1024)
     parser.add_argument('--n-epoch', type=int, default=10)
     parser.add_argument('--gpu', type=int, default=-1)
-    parser.add_argument('--n-out-channel', type=int, default=100)
     parser.add_argument('--user-lambda', type=float, default=10)
     parser.add_argument('--item-lambda', type=float, default=100)
     args = parser.parse_args()
     print(args)
-    train_convmf(**vars(args))
+    train_mf(**vars(args))

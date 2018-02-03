@@ -18,12 +18,14 @@ class ConvMF(chainer.Chain):
                  descriptions,
                  n_factor=300,
                  user_lambda=10,
-                 item_lambda=100):
+                 item_lambda=100,
+                 use_cnn=True):
         super(ConvMF, self).__init__()
         self.n_factor = n_factor
         self.user_lambda = user_lambda
         self.item_lambda = item_lambda
         self.descriptions = descriptions
+        self.use_cnn = use_cnn
         self.convolution_item_factor = self.xp.zeros(shape=(len(descriptions), n_factor), dtype=self.xp.float32)
         n_item = max([x.item for x in ratings]) + 1
         n_user = max([x.user for x in ratings]) + 1
@@ -35,35 +37,40 @@ class ConvMF(chainer.Chain):
 
     def __call__(self, user, item, rating=None):
         user_factor = self.user_factor(user)
+        item_factor = self.item_factor(item)
 
         if chainer.configuration.config.train:
-            item_factor = self.item_factor(item)
             approximates = functions.matmul(functions.expand_dims(user_factor, axis=1),
                                             functions.expand_dims(item_factor, axis=1),
                                             transb=True)
             loss = functions.mean_squared_error(functions.expand_dims(rating, axis=1), approximates)
             user_weight = functions.mean(functions.square(user_factor))
-            item_error = functions.mean_squared_error(self.convolution_item_factor[item], item_factor)
-            loss += self.user_lambda * user_weight + self.item_lambda * item_error
+            loss += self.user_lambda * user_weight
+            if self.use_cnn:
+                item_error = functions.mean_squared_error(self.convolution_item_factor[item], item_factor)
+                loss += self.item_lambda * item_error
+            else:
+                item_error = functions.mean(functions.square(item_factor))
+                loss += self.item_lambda * item_error
             chainer.reporter.report({'loss': loss}, self)
             return loss
 
         if rating is not None:
-            approximates = functions.matmul(functions.expand_dims(user_factor, axis=1),
-                                            functions.expand_dims(self.convolution_item_factor[item], axis=1),
-                                            transb=True)
+            if self.use_cnn:
+                approximates = functions.matmul(functions.expand_dims(user_factor, axis=1),
+                                                functions.expand_dims(self.convolution_item_factor[item], axis=1),
+                                                transb=True)
+            else:
+                approximates = functions.matmul(functions.expand_dims(user_factor, axis=1),
+                                                functions.expand_dims(item_factor, axis=1),
+                                                transb=True)
             loss = functions.mean_squared_error(functions.expand_dims(rating, axis=1), approximates)
             chainer.reporter.report({'loss': loss}, self)
-
-            item_factor = self.item_factor(item)
-            approximates = functions.matmul(functions.expand_dims(user_factor, axis=1),
-                                            functions.expand_dims(item_factor, axis=1),
-                                            transb=True)
-            loss2 = functions.mean_squared_error(functions.expand_dims(rating, axis=1), approximates)
-            chainer.reporter.report({'loss2': loss2}, self)
             return loss
 
-        return functions.matmul(user_factor, self.convolution_item_factor[item], transb=True)
+        if self.use_cnn:
+            return functions.matmul(user_factor, self.convolution_item_factor[item], transb=True)
+        return functions.matmul(user_factor, item_factor, transb=True)
 
     def update_convolution_item_factor(self, cnn: 'CNNRand', batch_size=50):
         with chainer.configuration.using_config('train', False):
