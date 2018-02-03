@@ -146,7 +146,8 @@ def train_mf(batch_size: int, n_epoch: int, gpu: int, user_lambda: float, item_l
                 n_factor=n_factor,
                 user_lambda=user_lambda,
                 item_lambda=item_lambda,
-                descriptions=[])
+                descriptions=[],
+                use_cnn=False)
 
     if gpu >= 0:
         chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
