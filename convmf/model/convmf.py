@@ -54,6 +54,13 @@ class ConvMF(chainer.Chain):
                                             transb=True)
             loss = functions.mean_squared_error(functions.expand_dims(rating, axis=1), approximates)
             chainer.reporter.report({'loss': loss}, self)
+
+            item_factor = self.item_factor(item)
+            approximates = functions.matmul(functions.expand_dims(user_factor, axis=1),
+                                            functions.expand_dims(item_factor, axis=1),
+                                            transb=True)
+            loss2 = functions.mean_squared_error(functions.expand_dims(rating, axis=1), approximates)
+            chainer.reporter.report({'loss2': loss2}, self)
             return loss
 
         return functions.matmul(user_factor, self.convolution_item_factor[item], transb=True)
