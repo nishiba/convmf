@@ -72,7 +72,7 @@ def make_cnn_data(ratings, item_descriptions):
 def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int, n_out_channel: int,
                  user_lambda: float, item_lambda: float, n_factor: int):
     ratings = make_rating_data()
-    filter_windows = [3, 4, 5]
+    filter_windows = [2, 3, 4, 5]
     max_sentence_length = 200
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
     dropout_ratio = 0.5
@@ -110,6 +110,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     # pre-train mf
     def _train_mf():
         print('_train_mf...')
+        print(datetime.now())
         updater = training.StandardUpdater(train_iter['mf'], optimizers['mf'], device=gpu)
         trainer = training.Trainer(updater, (10, 'epoch'), out='result')
         trainer.extend(extensions.Evaluator(test_iter['mf'], mf, device=gpu), name='test')
@@ -135,6 +136,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     # pre-train cnn
     def _train_cnn():
         print('_train_cnn...')
+        print(datetime.now())
         updater = training.StandardUpdater(train_iter['cnn'], optimizers['cnn'], device=gpu)
         trainer = training.Trainer(updater, (15, 'epoch'), out='result')
         trainer.extend(extensions.Evaluator(test_iter['cnn'], cnn, device=gpu), name='test')
@@ -150,7 +152,6 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     # train alternately
     for n in range(10):
         print('train alternately:', n)
-        print(datetime.now())
         mf.update_convolution_item_factor(cnn, batch_size=cnn_batch_size)
         _train_mf()
         cnn.update_item_factors(mf.item_factor.W.data)

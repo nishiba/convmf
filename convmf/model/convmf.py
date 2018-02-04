@@ -121,21 +121,23 @@ class CNNRand(chainer.Chain):
                                                      n_out_channel=self.n_out_channel,
                                                      n_factor=self.n_factor,
                                                      filter_windows=self.filter_windows)
-            self.fully_connected = links.Linear(self.n_out_channel * len(self.filter_windows), self.n_factor)
+            self.fully_connected1 = links.Linear(self.n_out_channel * len(self.filter_windows), self.n_out_channel * len(self.filter_windows))
+            self.fully_connected2 = links.Linear(self.n_out_channel * len(self.filter_windows), self.n_factor)
 
     def __call__(self, x, t=None):
         # item embedding
         embedding = functions.expand_dims(self.embedId(x), axis=1)
         convolutions = [functions.relu(c(embedding)) for c in self.convolution_links]
         poolings = functions.concat([functions.max_pooling_2d(c, ksize=(c.shape[2])) for c in convolutions], axis=2)
-        y = functions.dropout(functions.tanh(self.fully_connected(functions.tanh(poolings))), ratio=self.dropout_ratio)
+        y1 = functions.dropout(functions.tanh(self.fully_connected1(poolings)), ratio=self.dropout_ratio)
+        y2 = functions.dropout(functions.tanh(self.fully_connected2(y1)), ratio=self.dropout_ratio)
 
         if t is not None:
-            loss = functions.mean_squared_error(y, self.item_factors[t])
+            loss = functions.mean_squared_error(y2, self.item_factors[t])
             chainer.reporter.report({'loss': loss}, self)
             return loss
         else:
-            return y
+            return y2
 
     def update_item_factors(self, item_factors):
         self.item_factors = item_factors
