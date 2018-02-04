@@ -108,7 +108,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     # pre-train mf
     def _train_mf():
         updater = training.StandardUpdater(train_iter['mf'], optimizers['mf'], device=gpu)
-        trainer = training.Trainer(updater, (10, 'epoch'), out='result')
+        trainer = training.Trainer(updater, (20, 'epoch'), out='result')
         trainer.extend(extensions.Evaluator(test_iter['mf'], mf, device=gpu), name='test')
         trainer.extend(extensions.LogReport())
         trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
@@ -122,7 +122,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     # pre-train cnn
     def _train_cnn():
         updater = training.StandardUpdater(train_iter['cnn'], optimizers['cnn'], device=gpu)
-        trainer = training.Trainer(updater, (50, 'epoch'), out='result')
+        trainer = training.Trainer(updater, (20, 'epoch'), out='result')
         trainer.extend(extensions.Evaluator(test_iter['cnn'], cnn, device=gpu), name='test')
         trainer.extend(extensions.LogReport())
         trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
@@ -134,6 +134,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     _train_cnn()
 
     # train alternately
+    mf.item_lambda = 1
     for n in range(10):
         print('train alternately:', n)
         mf.update_convolution_item_factor(cnn, batch_size=cnn_batch_size)
@@ -225,7 +226,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=int, default=-1)
     parser.add_argument('--n-out-channel', type=int, default=100)
     parser.add_argument('--user-lambda', type=float, default=10)
-    parser.add_argument('--item-lambda', type=float, default=1)
+    parser.add_argument('--item-lambda', type=float, default=100)
     parser.add_argument('--n-factor', type=int, default=200)
     args = parser.parse_args()
     print(args)
