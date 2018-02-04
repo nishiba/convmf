@@ -52,7 +52,7 @@ class ConvMF(chainer.Chain):
             else:
                 item_error = functions.mean(functions.square(item_factor))
                 loss += self.item_lambda * item_error
-            chainer.reporter.report({'loss': loss}, self)
+            # chainer.reporter.report({'loss': loss}, self)
             return loss
 
         if rating is not None:
