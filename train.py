@@ -100,6 +100,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     optimizers = {'mf': chainer.optimizers.Adam(), 'cnn': chainer.optimizers.Adam()}
     optimizers['mf'].setup(mf)
     optimizers['cnn'].setup(cnn)
+    optimizers['cnn'].add_hook(chainer.optimizer.WeightDecay(0.0005))
 
     train_iter = {'mf': iterators.SerialIterator(train_mf, mf_batch_size, shuffle=True),
                   'cnn': iterators.SerialIterator(train_cnn, cnn_batch_size, shuffle=True)}
