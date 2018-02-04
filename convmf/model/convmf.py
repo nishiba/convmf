@@ -126,7 +126,7 @@ class CNNRand(chainer.Chain):
         embedding = functions.expand_dims(self.embedId(x), axis=1)
         convolutions = [functions.relu(c(embedding)) for c in self.convolution_links]
         poolings = functions.concat([functions.max_pooling_2d(c, ksize=(c.shape[2])) for c in convolutions], axis=2)
-        y = functions.tanh(functions.dropout(self.fully_connected(poolings), ratio=self.dropout_ratio))
+        y = functions.dropout(functions.tanh(self.fully_connected(poolings)), ratio=self.dropout_ratio)
 
         if t is not None:
             loss = functions.mean_squared_error(y, self.item_factors[t])
