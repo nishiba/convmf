@@ -74,7 +74,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     filter_windows = [3, 4, 5]
     max_sentence_length = 200
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
-    dropout_ratio = 0.5
+    dropout_ratio = 0.2
 
     mf = ConvMF(ratings=ratings,
                 n_factor=n_factor,
