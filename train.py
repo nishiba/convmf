@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from chainer import training, iterators, serializers
 from chainer.training import extensions
+from datetime import datetime, tzinfo
 from gensim.corpora.dictionary import Dictionary
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
@@ -74,7 +75,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     filter_windows = [3, 4, 5]
     max_sentence_length = 200
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
-    dropout_ratio = 0.2
+    dropout_ratio = 0.5
 
     mf = ConvMF(ratings=ratings,
                 n_factor=n_factor,
@@ -112,7 +113,8 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
         trainer = training.Trainer(updater, (10, 'epoch'), out='result')
         trainer.extend(extensions.Evaluator(test_iter['mf'], mf, device=gpu), name='test')
         trainer.extend(extensions.LogReport())
-        trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'main/item_error', 'test/main/loss', 'elapsed_time']))
+        trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'main/cnn_loss', 'main/item_error',
+                                                       'test/main/loss', 'test/main/cnn_loss', 'elapsed_time']))
         trainer.extend(extensions.ProgressBar())
         trainer.run()
         train_iter['mf'].reset()
@@ -147,6 +149,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     # train alternately
     for n in range(10):
         print('train alternately:', n)
+        print(datetime.now())
         mf.update_convolution_item_factor(cnn, batch_size=cnn_batch_size)
         _train_mf()
         cnn.update_item_factors(mf.item_factor.W.data)
