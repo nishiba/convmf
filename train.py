@@ -69,7 +69,7 @@ def make_cnn_data(ratings, item_descriptions):
 
 def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int, n_out_channel: int,
                  user_lambda: float, item_lambda: float, n_factor: int):
-    ratings = make_rating_data()[:100]
+    ratings = make_rating_data()
     filter_windows = [3, 4, 5]
     max_sentence_length = 300
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
