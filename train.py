@@ -72,7 +72,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
                  user_lambda: float, item_lambda: float, n_factor: int):
     ratings = make_rating_data()
     filter_windows = [3, 4, 5]
-    max_sentence_length = 100
+    max_sentence_length = 200
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
     dropout_ratio = 0.5
 
@@ -122,7 +122,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     # pre-train cnn
     def _train_cnn():
         updater = training.StandardUpdater(train_iter['cnn'], optimizers['cnn'], device=gpu)
-        trainer = training.Trainer(updater, (10, 'epoch'), out='result')
+        trainer = training.Trainer(updater, (50, 'epoch'), out='result')
         trainer.extend(extensions.Evaluator(test_iter['cnn'], cnn, device=gpu), name='test')
         trainer.extend(extensions.LogReport())
         trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
