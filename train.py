@@ -27,7 +27,7 @@ def make_rating_data(size: int = None) -> List[RatingData]:
     return [RatingData(*t) for t in ratings.itertuples(index=False)]
 
 
-def make_item_descriptions(max_sentence_length=None):
+def make_item_descriptions(max_sentence_length=100):
     descriptions = pd.read_csv(os.path.join('data', 'descriptions.csv')).rename(columns={'movie': 'item'})
     descriptions['crew'] = descriptions['crew'].apply(lambda x: ast.literal_eval(x))
     descriptions['cast'] = descriptions['cast'].apply(lambda x: ast.literal_eval(x))
@@ -49,11 +49,10 @@ def make_item_descriptions(max_sentence_length=None):
     texts = texts.apply(lambda x: np.pad(x, (0, max_sentence_length - len(x)), 'constant', constant_values=(0, eos_id)))
 
     # change types
-    texts = texts.apply(lambda x: x.astype(np.int32))
+    texts = texts.apply(lambda x: x.tolist())
     descriptions.id = descriptions.id.astype(np.int32)
 
-    return np.array(descriptions.id.values), np.array(texts), len(dictionary.keys()) + 1
-
+    return np.array(descriptions.id.values), np.array(list(texts.values), dtype=np.int32), len(dictionary.keys()) + 1
 
 
 def make_mf_data(ratings):
@@ -73,7 +72,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
                  user_lambda: float, item_lambda: float, n_factor: int):
     ratings = make_rating_data()
     filter_windows = [3, 4, 5]
-    max_sentence_length = 300
+    max_sentence_length = 100
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
     dropout_ratio = 0.5
 
