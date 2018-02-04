@@ -226,7 +226,7 @@ if __name__ == '__main__':
     parser.add_argument('--n-out-channel', type=int, default=100)
     parser.add_argument('--user-lambda', type=float, default=10)
     parser.add_argument('--item-lambda', type=float, default=100)
-    parser.add_argument('--n-factor', type=float, default=200)
+    parser.add_argument('--n-factor', type=int, default=200)
     args = parser.parse_args()
     print(args)
     train_convmf(**vars(args))
