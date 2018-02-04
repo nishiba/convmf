@@ -138,7 +138,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
         print('_train_cnn...')
         print(datetime.now())
         updater = training.StandardUpdater(train_iter['cnn'], optimizers['cnn'], device=gpu)
-        trainer = training.Trainer(updater, (15, 'epoch'), out='result')
+        trainer = training.Trainer(updater, (30, 'epoch'), out='result')
         trainer.extend(extensions.Evaluator(test_iter['cnn'], cnn, device=gpu), name='test')
         trainer.extend(extensions.LogReport())
         trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
