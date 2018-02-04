@@ -1,7 +1,6 @@
 # coding: utf-8
 import argparse
 import os
-import pickle
 from typing import List
 
 import chainer
@@ -9,13 +8,12 @@ import numpy as np
 import pandas as pd
 from chainer import training, iterators, serializers
 from chainer.training import extensions
-from datetime import datetime
 from gensim.corpora.dictionary import Dictionary
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
-from convmf.model.convmf import ConvMF, ConvMFUpdater, CNNRand
-from convmf.model.matrix_factorization import RatingData, MatrixFactorization
+from convmf.model.convmf import ConvMF, CNNRand
+from convmf.model.matrix_factorization import RatingData
 
 
 def make_rating_data(size: int = None) -> List[RatingData]:
@@ -49,7 +47,11 @@ def make_item_descriptions(max_sentence_length=None):
     texts = texts.apply(lambda x: x.astype(np.int32))
     descriptions.id = descriptions.id.astype(np.int32)
 
-    return np.array(list(descriptions.id.values)), np.array(list(texts.values)), len(dictionary.keys()) + 1
+    # add movie id
+    max_id = np.max(descriptions.id.values)
+    texts = texts.apply(lambda x: x + max_id + 1)
+    texts = [np.insert(t, 0, i) for i, t in zip(descriptions.id.values, texts.values)]
+    return np.array(descriptions.id.values), np.array(texts), len(dictionary.keys()) + max_id + 2
 
 
 def make_mf_data(ratings):
@@ -67,7 +69,7 @@ def make_cnn_data(ratings, item_descriptions):
 
 def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int, n_out_channel: int,
                  user_lambda: float, item_lambda: float, n_factor: int):
-    ratings = make_rating_data()
+    ratings = make_rating_data()[:100]
     filter_windows = [3, 4, 5]
     max_sentence_length = 300
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
@@ -81,7 +83,6 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
                 use_cnn=False)
 
     cnn = CNNRand(filter_windows=filter_windows,
-                  max_sentence_length=max_sentence_length,
                   n_word=n_word,
                   n_out_channel=n_out_channel,
                   dropout_ratio=dropout_ratio,

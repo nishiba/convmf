@@ -100,11 +100,10 @@ class ConvolutionList(chainer.ChainList):
 
 
 class CNNRand(chainer.Chain):
-    def __init__(self, filter_windows: List[int], max_sentence_length, n_word, n_factor, n_out_channel=100, dropout_ratio=0.5):
+    def __init__(self, filter_windows: List[int], n_word, n_factor, n_out_channel=100, dropout_ratio=0.5):
         super(CNNRand, self).__init__()
         # hyperparameters
         self.filter_windows = filter_windows
-        self.max_sentence_length = max_sentence_length
         self.n_word = n_word
         self.n_factor = n_factor
         self.n_in_channel = 1
