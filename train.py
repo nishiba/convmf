@@ -116,7 +116,16 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
         trainer.run()
         train_iter['mf'].reset()
 
-    _train_mf()
+    if os.path.exists('./result/convmf.npz'):
+        mf = serializers.load_npz('./result/convmf.npz')
+    else:
+        _train_mf()
+        mf.to_cpu()
+        serializers.save_npz('./result/convmf.npz', mf)
+
+    if gpu >= 0:
+        chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
+        mf.to_gpu()  # Copy the model to the GPU
     mf.use_cnn = True
 
     # pre-train cnn
