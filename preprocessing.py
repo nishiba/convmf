@@ -3,18 +3,32 @@ import os
 import re
 import pandas as pd
 import numpy as np
+import json
+
+
+def make_movie_data():
+    credit_df = pd.read_csv(os.path.join('data', 'tmdb-5000-movie-dataset', 'tmdb_5000_credits.csv'))[['movie_id', 'cast', 'crew']]
+    credit_df['cast'] = credit_df['cast'].apply(json.loads)
+    credit_df['cast'] = credit_df['cast'].apply(lambda xs: [x['name'] for x in xs[:10]])
+    credit_df['crew'] = credit_df['crew'].apply(json.loads)
+    credit_df['crew'] = credit_df['crew'].apply(lambda xs: [x['name'] for x in xs[:10]])
+
+    movie_df = pd.read_csv(os.path.join('data', 'tmdb-5000-movie-dataset', 'tmdb_5000_movies.csv'))[['id', 'title', 'overview']]
+    movie_df.title = movie_df.title.apply(lambda x: x.lower())
+    merged = pd.merge(movie_df, credit_df, left_on='id', right_on='movie_id')
+    return merged[['title', 'overview', 'cast', 'crew']]
 
 
 def make_descriptions():
     title_id = pd.read_csv(os.path.join('data', 'ml-10M100K', 'movies.dat'), sep='::', engine='python', names=['id', 'title', 'tag'])
     title_id = title_id[['id', 'title']]
     title_id.title = title_id.title.apply(lambda x: re.sub(r'\(\d+\)', '', x).rstrip())
-
-    movie_df = pd.read_csv(os.path.join('data', 'tmdb-5000-movie-dataset', 'tmdb_5000_movies.csv'))[['title', 'overview']]
-    movie_df.title = movie_df.title.apply(lambda x: x.lower())
     title_id.title = title_id.title.apply(lambda x: x.lower())
+
+    movie_df = make_movie_data()
+
     merged = pd.merge(movie_df, title_id, on='title')
-    merged = merged[['id', 'overview']].copy()
+    merged = merged[['id', 'overview', 'cast', 'crew']].copy()
     merged = merged.rename(columns={'overview': 'description'})
     merged.id = merged.id.astype(np.int32)
     return merged

@@ -2,6 +2,7 @@
 import argparse
 import os
 from typing import List
+import ast
 
 import chainer
 import numpy as np
@@ -28,10 +29,14 @@ def make_rating_data(size: int = None) -> List[RatingData]:
 
 def make_item_descriptions(max_sentence_length=None):
     descriptions = pd.read_csv(os.path.join('data', 'descriptions.csv')).rename(columns={'movie': 'item'})
+    descriptions['crew'] = descriptions['crew'].apply(lambda x: ast.literal_eval(x))
+    descriptions['cast'] = descriptions['cast'].apply(lambda x: ast.literal_eval(x))
     texts = descriptions.description
     texts = texts.apply(lambda x: x.strip().split())
+    descriptions['description'] = [['crew'] + crew + ['cast'] + cast + ['text'] + text
+                                   for crew, cast, text in zip(descriptions.crew, descriptions.cast, texts)]
+    texts = descriptions.description
     dictionary = Dictionary(texts.values)
-    dictionary.filter_extremes(keep_n=8000)
     eos_id = len(dictionary.keys())
 
     # to index list
@@ -47,11 +52,8 @@ def make_item_descriptions(max_sentence_length=None):
     texts = texts.apply(lambda x: x.astype(np.int32))
     descriptions.id = descriptions.id.astype(np.int32)
 
-    # add movie id
-    max_id = np.max(descriptions.id.values)
-    texts = texts.apply(lambda x: x + max_id + 1)
-    texts = [np.insert(t, 0, i) for i, t in zip(descriptions.id.values, texts.values)]
-    return np.array(descriptions.id.values), np.array(texts), len(dictionary.keys()) + max_id + 2
+    return np.array(descriptions.id.values), np.array(texts), len(dictionary.keys()) + 1
+
 
 
 def make_mf_data(ratings):
