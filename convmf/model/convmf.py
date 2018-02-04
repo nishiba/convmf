@@ -44,15 +44,16 @@ class ConvMF(chainer.Chain):
                                             functions.expand_dims(item_factor, axis=1),
                                             transb=True)
             loss = functions.mean_squared_error(functions.expand_dims(rating, axis=1), approximates)
+            chainer.reporter.report({'loss': loss}, self)
             user_weight = functions.mean(functions.square(user_factor))
             loss += self.user_lambda * user_weight
             if self.use_cnn:
                 item_error = functions.mean_squared_error(self.convolution_item_factor[item], item_factor)
+                chainer.reporter.report({'item_error': item_error}, self)
                 loss += self.item_lambda * item_error
             else:
                 item_error = functions.mean(functions.square(item_factor))
                 loss += self.item_lambda * item_error
-            # chainer.reporter.report({'loss': loss}, self)
             return loss
 
         if rating is not None:

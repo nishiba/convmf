@@ -112,7 +112,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
         trainer = training.Trainer(updater, (20, 'epoch'), out='result')
         trainer.extend(extensions.Evaluator(test_iter['mf'], mf, device=gpu), name='test')
         trainer.extend(extensions.LogReport())
-        trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
+        trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'main/item_error', 'test/main/loss', 'elapsed_time']))
         trainer.extend(extensions.ProgressBar())
         trainer.run()
         train_iter['mf'].reset()
