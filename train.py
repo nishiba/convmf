@@ -118,7 +118,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
         train_iter['mf'].reset()
 
     if os.path.exists('./result/convmf.npz'):
-        mf = serializers.load_npz('./result/convmf.npz')
+        serializers.load_npz('./result/convmf.npz', mf)
     else:
         _train_mf()
         mf.to_cpu()
