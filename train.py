@@ -122,7 +122,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     # pre-train cnn
     def _train_cnn():
         updater = training.StandardUpdater(train_iter['cnn'], optimizers['cnn'], device=gpu)
-        trainer = training.Trainer(updater, (20, 'epoch'), out='result')
+        trainer = training.Trainer(updater, (15, 'epoch'), out='result')
         trainer.extend(extensions.Evaluator(test_iter['cnn'], cnn, device=gpu), name='test')
         trainer.extend(extensions.LogReport())
         trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
@@ -134,7 +134,6 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     _train_cnn()
 
     # train alternately
-    mf.item_lambda = 1
     for n in range(10):
         print('train alternately:', n)
         mf.update_convolution_item_factor(cnn, batch_size=cnn_batch_size)
