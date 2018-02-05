@@ -72,7 +72,7 @@ def make_cnn_data(ratings, item_descriptions):
 def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int, n_out_channel: int,
                  user_lambda: float, item_lambda: float, n_factor: int):
     ratings = make_rating_data()
-    filter_windows = [2, 3, 4, 5]
+    filter_windows = [3, 4, 5]
     max_sentence_length = 200
     movie_ids, item_descriptions, n_word = make_item_descriptions(max_sentence_length=max_sentence_length)
     dropout_ratio = 0.5
@@ -108,13 +108,13 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
                  'cnn': iterators.SerialIterator(test_cnn, cnn_batch_size, repeat=False)}
 
     # pre-train mf
-    def _train_mf():
+    def _train_mf(epoch=10):
         print('_train_mf...')
         print(datetime.now())
         updater = training.StandardUpdater(train_iter['mf'], optimizers['mf'], device=gpu)
-        trainer = training.Trainer(updater, (10, 'epoch'), out='result')
+        trainer = training.Trainer(updater, (epoch, 'epoch'), out='result')
         trainer.extend(extensions.Evaluator(test_iter['mf'], mf, device=gpu), name='test')
-        trainer.extend(extensions.LogReport())
+        trainer.extend(extensions.LogReport(keys='mf'))
         trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'main/cnn_loss', 'main/item_error',
                                                        'test/main/loss', 'test/main/cnn_loss', 'elapsed_time']))
         trainer.extend(extensions.ProgressBar())
@@ -124,7 +124,7 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     if os.path.exists('./result/convmf.npz'):
         serializers.load_npz('./result/convmf.npz', mf)
     else:
-        _train_mf()
+        _train_mf(30)
         mf.to_cpu()
         serializers.save_npz('./result/convmf.npz', mf)
 
@@ -134,28 +134,28 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
     mf.use_cnn = True
 
     # pre-train cnn
-    def _train_cnn():
+    def _train_cnn(epoch=30):
         print('_train_cnn...')
         print(datetime.now())
         updater = training.StandardUpdater(train_iter['cnn'], optimizers['cnn'], device=gpu)
-        trainer = training.Trainer(updater, (30, 'epoch'), out='result')
+        trainer = training.Trainer(updater, (epoch, 'epoch'), out='result')
         trainer.extend(extensions.Evaluator(test_iter['cnn'], cnn, device=gpu), name='test')
-        trainer.extend(extensions.LogReport())
+        trainer.extend(extensions.LogReport(keys='cnn'))
         trainer.extend(extensions.PrintReport(entries=['epoch', 'main/loss', 'test/main/loss', 'elapsed_time']))
         trainer.extend(extensions.ProgressBar())
         trainer.run()
         train_iter['cnn'].reset()
 
     cnn.update_item_factors(mf.item_factor.W.data)
-    _train_cnn()
+    _train_cnn(30)
 
     # train alternately
     for n in range(10):
         print('train alternately:', n)
         mf.update_convolution_item_factor(cnn, batch_size=cnn_batch_size)
-        _train_mf()
+        _train_mf(3)
         cnn.update_item_factors(mf.item_factor.W.data)
-        _train_cnn()
+        _train_cnn(3)
 
     mf.to_cpu()
     cnn.to_cpu()
