@@ -50,6 +50,7 @@ class ConvMF(chainer.Chain):
             if self.use_cnn:
                 item_error = functions.mean_squared_error(self.convolution_item_factor[item], item_factor)
                 chainer.reporter.report({'item_error': item_error}, self)
+                item_error += functions.mean(functions.square(item_factor))
                 loss += self.item_lambda * item_error
             else:
                 item_error = functions.mean(functions.square(item_factor))
