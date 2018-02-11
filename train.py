@@ -121,12 +121,13 @@ def train_convmf(mf_batch_size: int, cnn_batch_size: int, n_epoch: int, gpu: int
         trainer.run()
         train_iter['mf'].reset()
 
-    if os.path.exists('./result/convmf.npz'):
-        serializers.load_npz('./result/convmf.npz', mf)
-    else:
-        _train_mf(30)
-        mf.to_cpu()
-        serializers.save_npz('./result/convmf.npz', mf)
+    # if os.path.exists('./result/convmf.npz'):
+    #     serializers.load_npz('./result/convmf.npz', mf)
+    # else:
+    #     _train_mf(30)
+    #     mf.to_cpu()
+    #     serializers.save_npz('./result/convmf.npz', mf)
+    _train_mf(30)
 
     if gpu >= 0:
         chainer.cuda.get_device_from_id(gpu).use()  # Make a specified GPU current
@@ -237,7 +238,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mf-batch-size', type=int, default=1024)
     parser.add_argument('--cnn-batch-size', type=int, default=64)
-    parser.add_argument('--n-epoch', type=int, default=10)
+    parser.add_argument('--n-epoch', type=int, default=30)
     parser.add_argument('--gpu', type=int, default=-1)
     parser.add_argument('--n-out-channel', type=int, default=100)
     parser.add_argument('--user-lambda', type=float, default=1)
