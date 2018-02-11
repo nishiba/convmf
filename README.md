@@ -14,7 +14,7 @@ pip install -r requirements.txt
 ```
 
 * download movie description data
-  * visit https://www.kaggle.com/tmdb/tmdb-movie-metadata
+  * visit https://www.kaggle.c  om/tmdb/tmdb-movie-metadata
   * download data and expand zip into ./data/
   * data directory must be as follows:
   ```bash
